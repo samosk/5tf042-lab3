@@ -1,0 +1,42 @@
+# ── .NET / ASP.NET Core ──
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.DotSettings.user
+
+# Published output
+publish/
+out/
+
+# ── React / Node ──
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Vite cache
+.vite/
+
+# ── Environment & secrets ──
+.env
+.env.local
+.env.*.local
+appsettings.Development.json
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── VS Code ──
+# Keep .vscode/launch.json and tasks.json (useful for teammates)
+# but ignore personal workspace settings
+.vscode/settings.json
+.vscode/*.code-workspace
+
+# ── Logs ──
+*.log
+npm-debug.log*
