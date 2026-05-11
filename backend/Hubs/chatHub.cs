@@ -20,6 +20,9 @@ namespace backend.Hubs
             ConnectedUsers[Context.ConnectionId] = user;
             //Notify everyone that this user joined the chat
             await Clients.All.SendAsync("UserJoined", username, role);
+
+            await BroadcastUserList();
+
             //Give the joining user confirmation that they have joined
             await Clients.Caller.SendAsync("JoinConfirmed", username, role);
         }
@@ -32,7 +35,10 @@ namespace backend.Hubs
             //If the user sending a message does not exist in the current session, ignore message
             if (!ConnectedUsers.TryGetValue(Context.ConnectionId, out var user)) return;
 
-            await Clients.All.SendAsync("RecieveMessage", new
+            //Clear typing indicator when message is sent
+            await StopTyping();
+
+            await Clients.All.SendAsync("ReceiveMessage", new
             {
                 id = Guid.NewGuid().ToString(),
                 username = user.Username,
@@ -58,7 +64,7 @@ namespace backend.Hubs
                 return;
             }
 
-            await Clients.All.SendAsync("RecieveMessage", new
+            await Clients.All.SendAsync("ReceiveMessage", new
             {
                 id = Guid.NewGuid().ToString(),
                 username = user.Username,
@@ -68,6 +74,21 @@ namespace backend.Hubs
                 channel = "announcement"
             });
         }
+
+        public async Task StartTyping()
+        {
+            if (!ConnectedUsers.TryGetValue(Context.ConnectionId, out var user)) return;
+
+            TypingUsers[Context.ConnectionId] = true;
+            await BroadcastTypingUsers();
+        }
+
+        public async Task StopTyping()
+        {
+            TypingUsers.TryRemove(Context.ConnectionId, out _);
+            await BroadcastTypingUsers();
+        }
+
         private async Task BroadcastTypingUsers()
         {
             var typingUsernames = TypingUsers.Keys
@@ -78,6 +99,15 @@ namespace backend.Hubs
             await Clients.All.SendAsync("TypingUsersUpdated", typingUsernames);
         }
 
+        private async Task BroadcastUserList()
+        {
+            var users = ConnectedUsers.Values
+                .Select(u => new { u.Username, u.Role })
+                .ToList();
+            
+            await Clients.All.SendAsync("UserListUpdated", users);
+        }
+
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             TypingUsers.TryRemove(Context.ConnectionId, out _);
@@ -86,6 +116,7 @@ namespace backend.Hubs
             {
                 await Clients.All.SendAsync("UserLeft", user.Username);
                 await BroadcastTypingUsers();
+                await BroadcastUserList();
             }
 
             await base.OnDisconnectedAsync(exception);
