@@ -20,7 +20,6 @@ namespace backend.Hubs
             ConnectedUsers[Context.ConnectionId] = user;
             //Notify everyone that this user joined the chat
             await Clients.All.SendAsync("UserJoined", username, role);
-
             //Give the joining user confirmation that they have joined
             await Clients.Caller.SendAsync("JoinConfirmed", username, role);
         }
@@ -28,10 +27,10 @@ namespace backend.Hubs
         public async Task SendMessage(string message)
         {
             //If the message sent is just blank, do nothing with it
-            if(string.IsNullOrWhiteSpace(message)) return;
+            if (string.IsNullOrWhiteSpace(message)) return;
 
             //If the user sending a message does not exist in the current session, ignore message
-            if(!ConnectedUsers.TryGetValue(Context.ConnectionId, out var user)) return;
+            if (!ConnectedUsers.TryGetValue(Context.ConnectionId, out var user)) return;
 
             await Clients.All.SendAsync("RecieveMessage", new
             {
@@ -47,10 +46,10 @@ namespace backend.Hubs
         public async Task SendAnnouncement(string message)
         {
             //If the message sent is just blank, do nothing with it
-            if(string.IsNullOrWhiteSpace(message)) return;
+            if (string.IsNullOrWhiteSpace(message)) return;
 
             //If the user sending a message does not exist in the current session, ignore message
-            if(!ConnectedUsers.TryGetValue(Context.ConnectionId, out var user)) return;
+            if (!ConnectedUsers.TryGetValue(Context.ConnectionId, out var user)) return;
 
             //Only teachers should be able to write announcements
             if (user.Role != "teacher")
@@ -68,6 +67,28 @@ namespace backend.Hubs
                 timestamp = DateTime.UtcNow.ToString("HH:mm"),
                 channel = "announcement"
             });
+        }
+        private async Task BroadcastTypingUsers()
+        {
+            var typingUsernames = TypingUsers.Keys
+                .Where(cid => ConnectedUsers.ContainsKey(cid))
+                .Select(cid => ConnectedUsers[cid].Username)
+                .ToList();
+
+            await Clients.All.SendAsync("TypingUsersUpdated", typingUsernames);
+        }
+
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            TypingUsers.TryRemove(Context.ConnectionId, out _);
+
+            if (ConnectedUsers.TryRemove(Context.ConnectionId, out var user))
+            {
+                await Clients.All.SendAsync("UserLeft", user.Username);
+                await BroadcastTypingUsers();
+            }
+
+            await base.OnDisconnectedAsync(exception);
         }
     }
     public class UserInfo
